@@ -117,12 +117,34 @@ class ProtoNet:
         accuracy_query_batch = []
         for task in task_batch:
             images_support, labels_support, images_query, labels_query = task
-            images_support = images_support.to(self.device)
-            labels_support = labels_support.to(self.device)
-            images_query = images_query.to(self.device)
-            labels_query = labels_query.to(self.device)
+            images_support = images_support.to(self.device) # size (num_support, channels, height, width)
+            labels_support = labels_support.to(self.device) # size (num_support)
+            images_query = images_query.to(self.device) # size (num_query, channels, height, width)
+            labels_query = labels_query.to(self.device) # size (num_query)
 
             ### START CODE HERE ###
+            # calculate the prototype for each class using the support set of images
+            prototypes = []
+            for c in torch.unique(labels_support):
+                # Prototype of class c is the mean of all the support set images of class c
+                prototypes.append(torch.mean(self._network(images_support[labels_support == c]), dim=0))
+            prototypes = torch.stack(prototypes) #  size (num_classes, latents), latents = dimension of the mapping function f_theta
+
+            # calculate the distance from each query image to each class prototype
+            # size of self._network(images_query) = (num_query, latents)
+            distances = torch.square(torch.cdist(self._network(images_query), prototypes)) # size (num_query, num_classes)
+
+            # calculate the log p_y for each query image
+            log_p_y = F.log_softmax(-distances, dim=1) # size (num_query, num_classes)
+
+            # calculate the mean negative log-likelihood over the query set
+            loss = F.nll_loss(log_p_y, labels_query) # size ()
+            loss_batch.append(loss)
+
+            distances_support = torch.square(torch.cdist(self._network(images_support), prototypes)) # size (num_support, num_classes)
+            accuracy_support_batch.append(util.score(distances_support, labels_support))
+            accuracy_query_batch.append(util.score(distances, labels_query))
+
             ### END CODE HERE ###
         return (
             torch.mean(torch.stack(loss_batch)),

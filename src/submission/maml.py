@@ -174,6 +174,20 @@ class MAML:
             for k, v in self._meta_parameters.items()
         }
         ### START CODE HERE ###
+
+        # calculate the gradient of the loss function with respect to the parameters and update the parameters using gradient descent rule
+        for i in range(self._num_inner_steps):
+            logits = self._forward(images, parameters)
+            loss = F.cross_entropy(logits, labels)
+            grad = torch.autograd.grad(loss, parameters.values(), create_graph=train)
+            parameters = {
+                k: v - self._inner_lrs[k] * g
+                for (k, v), g in zip(parameters.items(), grad)
+            }
+            accuracies.append(util.score(logits, labels))
+        logits = self._forward(images, parameters)
+        accuracies.append(util.score(logits, labels))
+
         ### END CODE HERE ###
         return parameters, accuracies
 
@@ -202,6 +216,16 @@ class MAML:
             images_query = images_query.to(self.device)
             labels_query = labels_query.to(self.device)
             ### START CODE HERE ###
+            # compute the adapted parameters and the support set accuracy over the course of the inner loop for each task in the batch using self._inner_loop
+            parameters, accuracy = self._inner_loop(images_support, labels_support, train)
+            accuracies_support_batch.append(accuracy)
+            # compute the query set logits using the adapted parameters
+            logits = self._forward(images_query, parameters)
+            # compute the query set accuracy using the adapted parameters
+            accuracy_query_batch.append(util.score(logits, labels_query))
+            # compute the MAML loss using the query set logits and labels
+            outer_loss_batch.append(F.cross_entropy(logits, labels_query))
+
             ### END CODE HERE ###
         outer_loss = torch.mean(torch.stack(outer_loss_batch))
         accuracies_support = np.mean(
