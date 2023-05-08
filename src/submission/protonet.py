@@ -123,16 +123,17 @@ class ProtoNet:
             labels_query = labels_query.to(self.device) # size (num_query)
 
             ### START CODE HERE ###
+            classes = torch.unique(labels_support)
+            num_classes = len(classes)
+            num_support_per_class = torch.unique(labels_support, return_counts=True)[1][0] # number of support images per class
             # calculate the prototype for each class using the support set of images
-            prototypes = []
-            for c in torch.unique(labels_support):
-                # Prototype of class c is the mean of all the support set images of class c
-                prototypes.append(torch.mean(self._network(images_support[labels_support == c]), dim=0))
-            prototypes = torch.stack(prototypes) #  size (num_classes, latents), latents = dimension of the mapping function f_theta
+            latent_support = self._network(images_support) # size (num_support, latents)
+            latent_support_by_class = latent_support.reshape(num_classes, num_support_per_class, -1) # size (num_classes, num_support_per_class, latents)
+            prototypes = torch.mean(latent_support_by_class, dim=1) # size (num_classes, latents)
 
             # calculate the distance from each query image to each class prototype
             # size of self._network(images_query) = (num_query, latents)
-            distances = torch.square(torch.cdist(self._network(images_query), prototypes)) # size (num_query, num_classes)
+            distances = torch.pow(torch.cdist(self._network(images_query), prototypes), 2) # size (num_query, num_classes)
 
             # calculate the log p_y for each query image
             log_p_y = F.log_softmax(-distances, dim=1) # size (num_query, num_classes)
@@ -141,9 +142,9 @@ class ProtoNet:
             loss = F.nll_loss(log_p_y, labels_query) # size ()
             loss_batch.append(loss)
 
-            distances_support = torch.square(torch.cdist(self._network(images_support), prototypes)) # size (num_support, num_classes)
-            accuracy_support_batch.append(util.score(distances_support, labels_support))
-            accuracy_query_batch.append(util.score(distances, labels_query))
+            distances_support = torch.pow(torch.cdist(self._network(images_support), prototypes), 2) # size (num_support, num_classes)
+            accuracy_support_batch.append(util.score(-distances_support, labels_support))
+            accuracy_query_batch.append(util.score(-distances, labels_query))
 
             ### END CODE HERE ###
         return (

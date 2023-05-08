@@ -175,7 +175,8 @@ class MAML:
         }
         ### START CODE HERE ###
 
-        # calculate the gradient of the loss function with respect to the parameters and update the parameters using gradient descent rule
+        # calculate the gradient of the loss function with respect to the parameters
+        # and update the parameters using gradient descent rule
         for i in range(self._num_inner_steps):
             logits = self._forward(images, parameters)
             loss = F.cross_entropy(logits, labels)
@@ -216,7 +217,8 @@ class MAML:
             images_query = images_query.to(self.device)
             labels_query = labels_query.to(self.device)
             ### START CODE HERE ###
-            # compute the adapted parameters and the support set accuracy over the course of the inner loop for each task in the batch using self._inner_loop
+            # compute the adapted parameters and the support set accuracy over the course
+            # of the inner loop for each task in the batch using self._inner_loop
             parameters, accuracy = self._inner_loop(images_support, labels_support, train)
             accuracies_support_batch.append(accuracy)
             # compute the query set logits using the adapted parameters
